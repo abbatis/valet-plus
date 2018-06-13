@@ -79,7 +79,8 @@ class PhpFpm
 
         // Get php.ini file.
         $phpBasePath = "/usr/local/Cellar/php@$newVersion/";
-        $extensionDirectory = $phpBasePath . (max(scandir($phpBasePath)))."/pecl/".$this->pecl->getPhpApiNumber($newVersion);
+        $extensionDirectory = $phpBasePath .
+            (max(scandir($phpBasePath)))."/pecl/".$this->pecl->getPhpApiNumber($newVersion);
 
         $phpIniPath = $this->pecl->getPhpIniPath();
         $contents = $this->files->get($phpIniPath);

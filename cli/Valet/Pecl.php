@@ -357,7 +357,7 @@ class Pecl extends AbstractPecl
             $pearDocDirPath = "/usr/local/share/pear@$phpVersion/doc";
             $phpBasePath = "/usr/local/Cellar/php@$phpVersion/";
             $extensionsBasePath = $phpBasePath .(max(scandir($phpBasePath)))."/pecl/";
-            $phpExtensionDirPath = $extensionsBasePath.max(scandir($extensionsBasePath));
+            $phpExtensionDirPath = $extensionsBasePath.$this->getPhpApiNumber($phpVersion);
             $phpBinPath = "/usr/local/opt/php@$phpVersion/bin";
             $pearDataDirPath = "/usr/local/share/pear@$phpVersion/data";
             $pearCfgDirPath = "/usr/local/share/pear@$phpVersion/cfg";
