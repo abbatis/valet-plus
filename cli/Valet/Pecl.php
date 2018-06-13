@@ -115,17 +115,15 @@ class Pecl extends AbstractPecl
     /**
      * Install a single extension.
      *
-     * @param $extension
+     * @param      $extension
      *    The extension key name.
      * @param null $version
+     *
+     * @throws \Exception
      */
     protected function install($extension, $version = null)
     {
-        if ($version === null) {
-            $result = $this->cli->runAsUser("pecl install $extension");
-        } else {
-            $result = $this->cli->runAsUser("pecl install $extension-$version");
-        }
+        $result = $this->cli->runAsUser("pecl install $extension".($version ? "-$version" : ""));
 
         $alias = $this->getExtensionAlias($extension);
         if (!preg_match("/Installing '(.*$alias.so)'/", $result)) {
@@ -357,7 +355,9 @@ class Pecl extends AbstractPecl
             $phpIniPath = str_replace('pear.conf', 'php.ini', $pearConfigPath);
             $phpDirPath = "/usr/local/share/pear@$phpVersion";
             $pearDocDirPath = "/usr/local/share/pear@$phpVersion/doc";
-            $phpExtensionDirPath = '/usr/local/lib/php/pecl/'.basename($pearConfig['ext_dir']);
+            $phpBasePath = "/usr/local/Cellar/php@$phpVersion/";
+            $extensionsBasePath = $phpBasePath .(max(scandir($phpBasePath)))."/pecl/";
+            $phpExtensionDirPath = $extensionsBasePath.max(scandir($extensionsBasePath));
             $phpBinPath = "/usr/local/opt/php@$phpVersion/bin";
             $pearDataDirPath = "/usr/local/share/pear@$phpVersion/data";
             $pearCfgDirPath = "/usr/local/share/pear@$phpVersion/cfg";
@@ -395,9 +395,14 @@ class Pecl extends AbstractPecl
                 $pearConfig['doc_dir'] = $pearDocDirPath;
             }
             // Check ext_dir value of par config.
-            if(empty($pearConfig['ext_dir']) || $pearConfig['ext_dir'] !== $phpExtensionDirPath){
+            if (
+                empty($pearConfig['ext_dir'])
+                || $pearConfig['ext_dir'] !== $phpExtensionDirPath
+                || $this->getExtensionDirectory() !== $phpExtensionDirPath
+            ) {
                 output("    Setting pear config ext_dir directive to: $phpExtensionDirPath");
                 $pearConfig['ext_dir'] = $phpExtensionDirPath;
+                $this->setPeclConfig('ext_dir', $phpExtensionDirPath);
             }
             // Check php_bin value of par config.
             if(empty($pearConfig['bin_dir']) || $pearConfig['bin_dir'] !== $phpBinPath){
@@ -452,6 +457,28 @@ class Pecl extends AbstractPecl
     function isInstalled($extension)
     {
         return strpos($this->cli->runAsUser('pecl list | grep ' . $extension), $extension) !== false;
+    }
+
+    /**
+     * @param $phpVersion
+     *
+     * @return string
+     */
+    function getPhpApiNumber($phpVersion)
+    {
+        $apiNoString = $this->cli->runAsUser('php -i | grep "Api No"');
+        $apiNumber = trim(preg_replace('/(Api No => )(\d+)/i', '$2', $apiNoString));
+        $phpBasePath = "/usr/local/Cellar/php@$phpVersion/";
+        $phpBaseExtDir = $phpBasePath . (max(scandir($phpBasePath)))."/pecl/";
+        $possibleExtensionDirs = scandir($phpBaseExtDir);
+        foreach ($possibleExtensionDirs as $possibleExtensionDir) {
+            $diff = abs(floatval($apiNumber)-floatval($possibleExtensionDir));
+            if (!isset($lastDiff) || $lastDiff > $diff) {
+                $lastDiff = $diff;
+                $result = $possibleExtensionDir;
+            }
+        }
+        return $result ?? null;
     }
 
     /**

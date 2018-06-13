@@ -40,7 +40,7 @@ class PhpFpm
         $version = $this->brew->linkedPhp();
 
         $this->files->ensureDirExists('/usr/local/var/log', user());
-        $this->updateConfiguration();
+        $this->updateConfiguration($version);
         $this->pecl->updatePeclChannel();
         $this->pecl->installExtensions($version);
         $this->peclCustom->installExtensions($version);
@@ -52,7 +52,7 @@ class PhpFpm
      *
      * @return void
      */
-    function updateConfiguration()
+    function updateConfiguration($newVersion)
     {
         $contents = $this->files->get($this->fpmConfigPath());
 
@@ -78,7 +78,9 @@ class PhpFpm
         $this->files->putAsUser($this->iniPath().'z-performance.ini', $contents);
 
         // Get php.ini file.
-        $extensionDirectory = $this->pecl->getExtensionDirectory();
+        $phpBasePath = "/usr/local/Cellar/php@$newVersion/";
+        $extensionDirectory = $phpBasePath . (max(scandir($phpBasePath)))."/pecl/".$this->pecl->getPhpApiNumber($newVersion);
+
         $phpIniPath = $this->pecl->getPhpIniPath();
         $contents = $this->files->get($phpIniPath);
 
@@ -178,11 +180,8 @@ class PhpFpm
 
         $this->stop();
 
-        info('Setting pecl config');
-        info($this->pecl->setPeclConfig('php_ini', str_replace($currentVersion, $version, $this->pecl->getPhpIniPath())));
-        info($this->pecl->setPeclConfig('ext_dir', str_replace($currentVersion, $version, $this->pecl->getExtensionDirectory())));
-
         $this->install();
+
         info("Valet is now using php@$version");
     }
 
