@@ -14,6 +14,7 @@ use Silly\Application;
 use Illuminate\Container\Container;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
 use SebastianBergmann\Version;
+use Symfony\Component\Console\Question\Question;
 
 /**
  * Create the application.
@@ -21,7 +22,7 @@ use SebastianBergmann\Version;
 Container::setInstance(new Container);
 
 // get current version based on git describe and tags
-$version = new Version('1.0.17' , __DIR__ . '/../');
+$version = new Version('1.0.20' , __DIR__ . '/../');
 
 $app = new Application('Valet+', $version->getVersion());
 
@@ -51,7 +52,7 @@ $app->command('install [--with-mariadb]', function ($withMariadb) {
     Nginx::install();
     PhpFpm::install();
     DnsMasq::install();
-    Mysql::install($withMariadb ? 'mariadb' : 'mysql');
+    Mysql::install($withMariadb ? 'mariadb' : 'mysql@5.7');
     RedisTool::install();
     Mailhog::install();
     Nginx::restart();
@@ -115,11 +116,15 @@ if (is_dir(VALET_HOME_PATH)) {
     /**
      * Register a symbolic link with Valet.
      */
-    $app->command('link [name] [--secure]', function ($name, $secure) {
+    $app->command('link [name] [--secure] [--proxy]', function ($name, $secure, $proxy) {
         $domain = Site::link(getcwd(), $name = $name ?: basename(getcwd()));
 
         if ($secure) {
             $this->runCommand('secure '.$name);
+        }
+
+        if ($proxy) {
+            $this->runCommand('proxy '.$name);
         }
 
         info('Current working directory linked to '.$domain);
@@ -128,7 +133,7 @@ if (is_dir(VALET_HOME_PATH)) {
     /**
      * Register a subdomain link with Valet.
      */
-    $app->command('subdomain [action] [name] [--secure]', function ($action, $name, $secure) {
+    $app->command('subdomain [action] [name] [--secure] [--proxy]', function ($action, $name, $secure, $proxy) {
         if($action === 'list') {
             $links = Site::links(basename(getcwd()));
 
@@ -143,7 +148,18 @@ if (is_dir(VALET_HOME_PATH)) {
                 $this->runCommand('secure '. $name);
             }
 
+            if ($proxy) {
+                $this->runCommand('proxy '.$name);
+            }
+
             info('Current working directory linked to '.$domain);
+            return;
+        }
+
+        if($action === 'remove') {
+            Site::unlink($name.'.'.basename(getcwd()));
+
+            info('Current working directory unlinked from '.$name.'.'.basename(getcwd()));
             return;
         }
 
@@ -189,7 +205,11 @@ if (is_dir(VALET_HOME_PATH)) {
     $app->command('unsecure [domain]', function ($domain = null) {
         $url = ($domain ?: Site::host(getcwd())).'.'.Configuration::read()['domain'];
 
+        $proxied = Site::proxied($url);
         Site::unsecure($url);
+        if ($proxied) {
+            Site::proxy($url, $proxied);
+        }
 
         PhpFpm::restart();
 
@@ -369,9 +389,6 @@ if (is_dir(VALET_HOME_PATH)) {
     /**
      * Stop the daemon services.
      */
-    /**
-     * Start the daemon services.
-     */
     $app->command('stop [services]*', function ($services) {
         if(empty($services)) {
             DnsMasq::stop();
@@ -546,6 +563,16 @@ if (is_dir(VALET_HOME_PATH)) {
             if(!$name) {
                 throw new Exception('Please provide a dump file');
             }
+
+            // check if database already exists.
+            if(Mysql::isDatabaseExists($optional)){
+                $question = new ConfirmationQuestion('Database already exists are you sure you want to continue? [y/N] ', FALSE);
+                if (!$helper->ask($input, $output, $question)) {
+                    warning('Aborted');
+                    return;
+                }
+            }
+
             Mysql::importDatabase($name, $optional);
             return;
         }
@@ -682,6 +709,28 @@ if (is_dir(VALET_HOME_PATH)) {
         throw new Exception('Sub-command not found. Available: install');
     })->descriptions('Enable / disable Varnish');
 
+    $app->command('mailhog [mode]', function ($mode) {
+        $modes = ['install', 'on', 'enable', 'off', 'disable'];
+
+        if (!in_array($mode, $modes)) {
+            throw new Exception('Mode not found. Available modes: '.implode(', ', $modes));
+        }
+
+        switch ($mode) {
+            case 'install':
+                Mailhog::install();
+                return;
+            case 'enable':
+            case 'on':
+                Mailhog::enable();
+                return;
+            case 'disable':
+            case 'off':
+                Mailhog::disable();
+                return;
+        }
+    })->descriptions('Enable / disable Mailhog');
+
     $app->command('tower', function () {
         DevTools::tower();
     })->descriptions('Open closest git project in Tower');
@@ -690,6 +739,10 @@ if (is_dir(VALET_HOME_PATH)) {
         DevTools::phpstorm();
     })->descriptions('Open closest git project in PHPstorm');
 
+    $app->command('sourcetree', function () {
+        DevTools::sourcetree();
+    })->descriptions('Open closest git project in SourceTree');
+
     $app->command('vscode', function () {
         DevTools::vscode();
     })->descriptions('Open closest git project in Visual Studio Code');
@@ -697,6 +750,35 @@ if (is_dir(VALET_HOME_PATH)) {
     $app->command('ssh-key', function () {
         DevTools::sshkey();
     })->descriptions('Copy ssh key');
+
+    /**
+     * Proxy commands
+     */
+    $app->command('proxy [url]', function ($input, $output, $url = null) {
+        $url = ($url ?: Site::host(getcwd())).'.'.Configuration::read()['domain'];
+        $helper = $this->getHelperSet()->get('question');
+        $question = new Question('Where would you like to proxy this url to? ');
+        if (!$to = $helper->ask($input, $output, $question)) {
+            warning('Aborting, url is required');
+        }
+
+        Site::proxy($url, $to);
+
+        PhpFpm::restart();
+        Nginx::restart();
+
+        info("The [$url] will now proxy traffic to [$to].");
+    })->descriptions('Enable proxying for a site instead of handling it with a Valet driver. Useful for SPAs and Swoole applications.');
+
+    $app->command('unproxy [url]', function ($url = null) {
+        $url = ($url ?: Site::host(getcwd())).'.'.Configuration::read()['domain'];
+        Site::proxy($url);
+
+        PhpFpm::restart();
+        Nginx::restart();
+
+        info("The [$url] will no longer proxy traffic and will use the Valet driver instead.");
+    })->descriptions('Disable proxying for a site re-instating handling with a Valet driver.');
 }
 
 /**

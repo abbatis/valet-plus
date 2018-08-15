@@ -101,12 +101,12 @@ class Magento2ValetDriver extends ValetDriver
             $uri = '/static' . $resource;
         }
 
-        if (strpos($uri, '/js-translation.json') === false && file_exists($staticFilePath = $sitePath . '/pub' . $uri)) {
-            return $staticFilePath;
+        if (strpos($uri, '/js-translation.json') !== false) {
+            header('Cache-Control: no-store, must-revalidate');
         }
 
-        if(strpos($uri, '/js-translation.json') !== false) {
-            header('Cache-Control: no-store, must-revalidate');
+        if (file_exists($staticFilePath = $sitePath . '/pub' . $uri)) {
+            return $staticFilePath;
         }
 
         if (strpos($uri, '/static/') === 0) {
@@ -133,6 +133,9 @@ class Magento2ValetDriver extends ValetDriver
      */
     public function frontControllerPath($sitePath, $siteName, $uri)
     {
+        $this->loadServerEnvironmentVariables($sitePath, $siteName);
+        $_SERVER['SERVER_NAME'] = $_SERVER['HTTP_HOST'];
+
         if(isset($_GET['profile'])) {
             $_SERVER['MAGE_PROFILER'] = 'html';
         }
@@ -167,6 +170,10 @@ class Magento2ValetDriver extends ValetDriver
             http_response_code(404);
             require __DIR__.'/../templates/magento2.php';
             exit;
+        }
+
+        if(strpos($uri, '/dev/tests/acceptance/utils/command.php') !== false) {
+            return $sitePath . '/dev/tests/acceptance/utils/command.php';
         }
 
         $_SERVER['DOCUMENT_ROOT'] = $sitePath;
