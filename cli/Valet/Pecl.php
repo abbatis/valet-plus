@@ -322,7 +322,7 @@ class Pecl extends AbstractPecl
         // Check if pear config is set correctly as per:
         // https://github.com/kabel/homebrew-core/blob/2564749d8f73e43cbb8cfc449bca4f564ac0e9e1/Formula/php%405.6.rb
         // Brew installation standard.
-        foreach (['5.6', '7.0', '7.1', '7.2'] as $phpVersion){
+        foreach (Brew::SUPPORTED_PHP_FORMULAE as $phpVersion => $brewname) {
             output("Checking php $phpVersion...");
 
             $pearConfigPath = "/usr/local/etc/php/$phpVersion/pear.conf";
@@ -352,32 +352,21 @@ class Pecl extends AbstractPecl
                 continue;
             }
 
+            $pearName = $this->replacePhpWithPear($brewname);
+
             $phpIniPath = str_replace('pear.conf', 'php.ini', $pearConfigPath);
-            $phpDirPath = "/usr/local/share/pear@$phpVersion";
-            $pearDocDirPath = "/usr/local/share/pear@$phpVersion/doc";
+            $phpDirPath = "/usr/local/share/$pearName";
+            $pearDocDirPath = "/usr/local/share/$pearName/doc";
             $phpBasePath = "/usr/local/Cellar/php@$phpVersion/";
             $extensionsBasePath = $phpBasePath .(max(scandir($phpBasePath)))."/pecl/";
-            $phpExtensionDirPath = $extensionsBasePath.$this->getPhpApiNumber($phpVersion);
-            $phpBinPath = "/usr/local/opt/php@$phpVersion/bin";
-            $pearDataDirPath = "/usr/local/share/pear@$phpVersion/data";
-            $pearCfgDirPath = "/usr/local/share/pear@$phpVersion/cfg";
-            $pearWwwDirPath = "/usr/local/share/pear@$phpVersion/htdocs";
+            $phpExtensionDirPath = '/usr/local/lib/php/pecl/'.basename($pearConfig['ext_dir']);
+            $phpBinPath = "/usr/local/opt/$brewname/bin";
+            $pearDataDirPath = "/usr/local/share/$pearName/data";
+            $pearCfgDirPath = "/usr/local/share/$pearName/cfg";
+            $pearWwwDirPath = "/usr/local/share/$pearName/htdocs";
             $pearManDirPath = '/usr/local/share/man';
-            $pearTestDirPath = "/usr/local/share/pear@$phpVersion/test";
-            $phpBinDirPath = "/usr/local/opt/php@$phpVersion/bin/php";
-
-            // PhP 7.2 doesn't work with a @ version annotation.
-            if($phpVersion === '7.2'){
-                $phpDirPath = str_replace("@$phpVersion", '', $phpDirPath);
-                $pearDocDirPath = str_replace("@$phpVersion", '', $pearDocDirPath);
-                $phpBinPath = str_replace("@$phpVersion", '', $phpBinPath);
-                $pearDataDirPath = str_replace("@$phpVersion", '', $pearDataDirPath);
-                $pearCfgDirPath = str_replace("@$phpVersion", '', $pearCfgDirPath);
-                $pearWwwDirPath = str_replace("@$phpVersion", '', $pearWwwDirPath);
-                $pearDataDirPath = str_replace("@$phpVersion", '', $pearDataDirPath);
-                $pearTestDirPath = str_replace("@$phpVersion", '', $pearTestDirPath);
-                $phpBinDirPath = str_replace("@$phpVersion", '', $phpBinDirPath);
-            }
+            $pearTestDirPath = "/usr/local/share/$pearName/test";
+            $phpBinDirPath = "/usr/local/opt/$brewname/bin/php";
 
             // Check php_ini value of par config.
             if(empty($pearConfig['php_ini']) || $pearConfig['php_ini'] !== $phpIniPath){
@@ -602,5 +591,9 @@ class Pecl extends AbstractPecl
             default:
                 return true;
         }
+    }
+
+    private function replacePhpWithPear($brewname) {
+        return str_replace('php', 'pear', $brewname);
     }
 }

@@ -22,7 +22,7 @@ use Symfony\Component\Console\Question\Question;
 Container::setInstance(new Container);
 
 // get current version based on git describe and tags
-$version = new Version('1.0.20' , __DIR__ . '/../');
+$version = new Version('1.0.23' , __DIR__ . '/../');
 
 $app = new Application('Valet+', $version->getVersion());
 
@@ -66,6 +66,10 @@ $app->command('install [--with-mariadb]', function ($withMariadb) {
  * Fix common problems within the Valet+ installation.
  */
 $app->command('fix [--reinstall]', function ($reinstall) {
+    if (file_exists($_SERVER['HOME'] . '/.my.cnf')) {
+        warning('You have an .my.cnf file in your home directory. This can affect the mysql installation negatively.');
+    }
+
     PhpFpm::fix($reinstall);
     Pecl::fix();
 })->descriptions('Fixes common installation problems that prevent Valet+ from working');
@@ -252,7 +256,7 @@ if (is_dir(VALET_HOME_PATH)) {
     $app->command('open [domain]', function ($domain = null) {
         $url = "http://".($domain ?: Site::host(getcwd())).'.'.Configuration::read()['domain'];
 
-        passthru("open ".escapeshellarg($url));
+        passthru("sudo -u ".user(). " open ".escapeshellarg($url));
     })->descriptions('Open the site for the current (or specified) directory in your browser');
 
     /**
@@ -600,6 +604,16 @@ if (is_dir(VALET_HOME_PATH)) {
             return;
         }
 
+        if ($run === 'pwd' || $run === 'password') {
+            if (!$name || !$optional) {
+                throw new Exception('Missing arguments to change root user password. Use: "valet db pwd <old> <new>"');
+            }
+
+            info('Setting password for root user...');
+            Mysql::setRootPassword($name, $optional);
+            return;
+        }
+
         throw new Exception('Command not found');
     })->descriptions('Database commands (list/ls, create, drop, reset, open, import, reimport, export/dump)');
 
@@ -692,21 +706,47 @@ if (is_dir(VALET_HOME_PATH)) {
     })->descriptions('Enable / disable Elasticsearch');
 
     $app->command('rabbitmq [mode]', function ($mode) {
-        if($mode === 'install' || $mode === 'on') {
-            RabbitMq::install();
-            return;
+        $modes = ['install', 'on', 'enable', 'off', 'disable'];
+
+        if (!in_array($mode, $modes)) {
+            throw new Exception('Mode not found. Available modes: '.implode(', ', $modes));
         }
 
-        throw new Exception('Sub-command not found. Available: install');
+        switch ($mode) {
+            case 'install':
+                RabbitMq::install();
+                return;
+            case 'enable':
+            case 'on':
+                RabbitMq::enable();
+                return;
+            case 'disable':
+            case 'off':
+                RabbitMq::disable();
+                return;
+        }
     })->descriptions('Enable / disable RabbitMq');
 
     $app->command('varnish [mode]', function ($mode) {
-        if($mode === 'install' || $mode === 'on') {
-            Varnish::install();
-            return;
+        $modes = ['install', 'on', 'enable', 'off', 'disable'];
+
+        if (!in_array($mode, $modes)) {
+            throw new Exception('Mode not found. Available modes: '.implode(', ', $modes));
         }
 
-        throw new Exception('Sub-command not found. Available: install');
+        switch ($mode) {
+            case 'install':
+                Varnish::install();
+                return;
+            case 'enable':
+            case 'on':
+                Varnish::enable();
+                return;
+            case 'disable':
+            case 'off':
+                Varnish::disable();
+                return;
+        }
     })->descriptions('Enable / disable Varnish');
 
     $app->command('mailhog [mode]', function ($mode) {
@@ -730,6 +770,28 @@ if (is_dir(VALET_HOME_PATH)) {
                 return;
         }
     })->descriptions('Enable / disable Mailhog');
+
+    $app->command('redis [mode]', function ($mode) {
+        $modes = ['install', 'on', 'enable', 'off', 'disable'];
+
+        if (!in_array($mode, $modes)) {
+            throw new Exception('Mode not found. Available modes: '.implode(', ', $modes));
+        }
+
+        switch ($mode) {
+            case 'install':
+                RedisTool::install();
+                return;
+            case 'enable':
+            case 'on':
+                RedisTool::enable();
+                return;
+            case 'disable':
+            case 'off':
+                RedisTool::disable();
+                return;
+        }
+    })->descriptions('Enable / disable Redis');
 
     $app->command('tower', function () {
         DevTools::tower();
@@ -779,6 +841,30 @@ if (is_dir(VALET_HOME_PATH)) {
 
         info("The [$url] will no longer proxy traffic and will use the Valet driver instead.");
     })->descriptions('Disable proxying for a site re-instating handling with a Valet driver.');
+
+    $app->command('logs [service]', function ($service) {
+        $logs = [
+            'php' => '$HOME/.valet/Log/php.log',
+            'php-fpm' => '/usr/local/var/log/php-fpm.log',
+            'nginx' => '$HOME/.valet/Log/nginx-error.log',
+            'mysql' => '$HOME/.valet/Log/mysql.log',
+            'mailhog' => '/usr/local/var/log/mailhog.log',
+            'redis' => '/usr/local/var/log/redis.log',
+        ];
+
+        if (!isset($logs[$service])) {
+            warning('No logs found for [' . $service . ']. Available logs: '.implode(', ', array_keys($logs)));
+            return;
+        }
+
+        $path = $logs[$service];
+        if (!Logs::exists($path)) {
+            warning('The path `' . $path . '` does not (yet) exists');
+            return;
+        }
+
+        Logs::open($path);
+    })->descriptions('Open the logs for the specified service. (php, php-fpm, nginx, mysql, mailhog, redis)');
 }
 
 /**

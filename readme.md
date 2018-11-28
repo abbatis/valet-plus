@@ -165,6 +165,13 @@ Username: `root`
 
 Password: `root`
 
+## Change password
+
+```
+valet db pwd <old> <new>
+```
+
+
 ## List databases
 
 ```
@@ -253,6 +260,13 @@ When no name is given it'll try to find the closest git repository directory nam
 valet db open
 ```
 
+## Logging
+
+To easily read the log file of php, php-fpm, nginx, mysql, mailhog or redis you can use command below.
+```
+valet logs <logname>
+```
+
 ## Subdomains
 
 You can manage subdomains for the current working directory using:
@@ -292,6 +306,18 @@ valet mailhog off
 ## Redis
 
 Redis is automatically installed and listens on the default port `6379`. The redis socket is located at `/tmp/redis.sock`
+
+Enable Redis:
+
+```
+valet redis on
+```
+
+Disable Redis:
+
+```
+valet redis off
+```
 
 ## Elasticsearch
 
@@ -422,25 +448,24 @@ APCu is temporarily turned off due to a compatibility issue with PHP-FPM, see ht
 
 By default these are included:
 
-- Static HTML
-- Magento
-- Magento 2
-- Symfony
-- Wordpress / Bedrock
-- Laravel
-- Lumen
 - CakePHP 3
 - Craft
-- Jigsaw
-- Slim
-- Statamic
-- Zend Framework
 - Drupal
-- Typo3
+- Jigsaw
+- Laravel
+- Lumen
+- Magento
+- Magento 2
 - Neos
-- Craft
 - Pimcore 5
 - Shopware 5
+- Slim
+- Statamic
+- Static HTML
+- Symfony
+- Typo3
+- Wordpress / Bedrock
+- Zend Framework
 
 A full list can be found [here](cli/drivers).
 
@@ -573,3 +598,10 @@ This project is a fork of [laravel/valet](https://github.com/laravel/valet). Tha
 - Tim Neutkens ([@timneutkens](https://github.com/timneutkens))
 - Lou van der Laarse ([@Neodork](https://github.com/Neodork))
 - Sam Granger ([@samgranger](https://github.com/samgranger))
+
+
+## Get in touch
+
+[![slack](https://p9.zdassets.com/hc/theme_assets/138842/200037786/logo.png)](https://join.slack.com/t/valet-plus/shared_invite/enQtNDE2MjU2NzgyNjQwLTc4MmI0ZTlhM2FiODRjNmQxN2RlZDVlN2E2YjUwMDBjNGViYjVkNWQ4ODJjYzI3M2U4ZGM5M2Q3ZGQ3ZDQ2YjY)
+
+We have a slack workspace available [which you can join](https://join.slack.com/t/valet-plus/shared_invite/enQtNDE2MjU2NzgyNjQwLTc4MmI0ZTlhM2FiODRjNmQxN2RlZDVlN2E2YjUwMDBjNGViYjVkNWQ4ODJjYzI3M2U4ZGM5M2Q3ZGQ3ZDQ2YjY).
